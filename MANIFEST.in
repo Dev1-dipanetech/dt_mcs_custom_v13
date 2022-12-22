@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include dt_mcs_custom_v13 *.css
+recursive-include dt_mcs_custom_v13 *.csv
+recursive-include dt_mcs_custom_v13 *.html
+recursive-include dt_mcs_custom_v13 *.ico
+recursive-include dt_mcs_custom_v13 *.js
+recursive-include dt_mcs_custom_v13 *.json
+recursive-include dt_mcs_custom_v13 *.md
+recursive-include dt_mcs_custom_v13 *.png
+recursive-include dt_mcs_custom_v13 *.py
+recursive-include dt_mcs_custom_v13 *.svg
+recursive-include dt_mcs_custom_v13 *.txt
+recursive-exclude dt_mcs_custom_v13 *.pyc
