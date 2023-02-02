@@ -1,6 +1,5 @@
-# Copyright (c) 2015, Dipane Technologies Pvt. Ltd. and Contributors
-# License: GNU General Public License v3. See license.txt
-
+# Copyright (c) 2023, Dipane Technologies Pvt Ltd and contributors
+# For license information, please see license.txt
 
 from operator import itemgetter
 from typing import Any, Dict, List, Optional
@@ -24,6 +23,8 @@ class StockBalanceFilter():
 	item: Optional[str]
 	project: Optional[str]
 	batch_no : Optional[str]
+	posting_date : Optional[str]
+	voucher_type : Optional[str]
 	warehouse: Optional[str]
 	warehouse_type: Optional[str]
 	include_uom: Optional[str]  # include extra info in converted UOM
@@ -74,6 +75,8 @@ def execute(filters:Optional[StockBalanceFilter] =None):
 		company = group_by_key[0]
 		project = group_by_key[3]
 		batch_no = group_by_key[4]
+		posting_date = group_by_key[5]
+		voucher_type = group_by_key[6]
 
 		if item_map.get(item):
 			qty_dict = iwb_map[group_by_key]
@@ -89,6 +92,8 @@ def execute(filters:Optional[StockBalanceFilter] =None):
 				"warehouse": warehouse,
 				"company": company,
 				"project": project,
+				"posting_date": posting_date,
+				"voucher_type": voucher_type,
 				"batch_no" : batch_no,
 				"reorder_level": item_reorder_level,
 				"reorder_qty": item_reorder_qty,
@@ -151,6 +156,18 @@ def get_columns(filters: StockBalanceFilter):
 			"fieldtype": "Link",
 			"options": "Batch",
 			"width": 100,
+		},
+		{
+			"label": _("Date Of Stock Reco"),
+			"fieldname": "posting_date",
+			"fieldtype": "Date",
+			"width": 150,
+		},
+		{
+			"label": _("Stock Reco Status"),
+			"fieldname": "voucher_type",
+			"fieldtype": "Data",
+			"width": 150,
 		},
 		{
 			"label": _("Warehouse"),
@@ -309,14 +326,16 @@ def get_stock_ledger_entries(filters: StockBalanceFilter, items):
 	return frappe.db.sql(
 		"""
 		select
-			sle.item_code, warehouse, sle.posting_date, sle.actual_qty, sle.valuation_rate,
+			sle.item_code, warehouse, sle.actual_qty, sle.valuation_rate,
 			sle.company, sle.voucher_type, sle.qty_after_transaction, sle.stock_value_difference,
-			sle.item_code as name, sle.voucher_no, sle.stock_value, sle.batch_no, sle.project
+			sle.stock_value, sle.batch_no, sle.project, sle.item_code as name, 
+			(CASE WHEN sle.voucher_type = "Stock Reconciliation" then sle.posting_date else "" END) as posting_date,
+			(CASE WHEN sle.voucher_type = "Stock Reconciliation" then "Reconciled" else "Unreconciled" END) as voucher_type
 		from
 			`tabStock Ledger Entry` sle
 		where sle.docstatus < 2 %s %s
 		and is_cancelled = 0
-		order by sle.posting_date, sle.posting_time, sle.creation, sle.actual_qty"""
+		order by posting_date desc, sle.posting_date desc, sle.posting_time, sle.creation, sle.actual_qty"""
 		% (item_conditions_sql, conditions),  # nosec
 		as_dict=1,
 	)
@@ -355,15 +374,15 @@ def get_item_warehouse_map(filters: StockBalanceFilter, sle):
 
 		value_diff = flt(d.stock_value_difference)
 
-		if d.posting_date < from_date or (
-			d.posting_date == from_date
+		if d.posting_date < str(from_date) or (
+			d.posting_date == str(from_date)
 			and d.voucher_type == "Stock Reconciliation"
 			and frappe.db.get_value("Stock Reconciliation", d.voucher_no, "purpose") == "Opening Stock"
 		):
 			qty_dict.opening_qty += qty_diff
 			qty_dict.opening_val += value_diff
 
-		elif d.posting_date >= from_date and d.posting_date <= to_date:
+		elif d.posting_date >= str(from_date) and d.posting_date <= str(to_date):
 			if flt(qty_diff, float_precision) >= 0:
 				qty_dict.in_qty += qty_diff
 				qty_dict.in_val += value_diff
@@ -381,7 +400,7 @@ def get_item_warehouse_map(filters: StockBalanceFilter, sle):
 
 
 def get_group_by_key(row, filters) -> tuple:
-	group_by_key = [row.company, row.item_code, row.warehouse, row.project, row.batch_no]
+	group_by_key = [row.company, row.item_code, row.warehouse, row.project, row.batch_no, row.posting_date, row.voucher_type]
 
 	return tuple(group_by_key)
 
