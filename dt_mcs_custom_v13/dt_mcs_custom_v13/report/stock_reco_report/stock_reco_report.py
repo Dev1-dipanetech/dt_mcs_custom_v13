@@ -524,3 +524,4 @@ def get_variant_values_for(items):
 		attribute_map[attr["parent"]].update({attr["attribute"]: attr["attribute_value"]})
 
 	return attribute_map
+	
